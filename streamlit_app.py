@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import os
 import json
 import base64
@@ -7,23 +7,53 @@ import sys
 from datetime import datetime
 from dotenv import load_dotenv
 
-# Add the app directory to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
+# Load environment variables
+load_dotenv()
 
-# Import modules directly
+# Add current directory to Python path
+sys.path.append(os.path.dirname(__file__))
+
+# Try to import modules with multiple approaches
 try:
-    from github_utils import (
+    # Approach 1: Direct import from app folder
+    from app.github_utils import (
         create_repo, create_or_update_file, enable_pages, 
         generate_mit_license, create_or_update_binary_file
     )
-    from llm_generator import generate_app_code, decode_attachments
-    from notify import notify_evaluation_server
+    from app.llm_generator import generate_app_code, decode_attachments
+    from app.notify import notify_evaluation_server
+    st.success("? Modules imported successfully from app package")
 except ImportError as e:
-    st.error(f"Import error: {e}")
-    st.stop()
-
-# Load environment variables
-load_dotenv()
+    st.error(f"First import attempt failed: {e}")
+    try:
+        # Approach 2: Try absolute import
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("github_utils", "app/github_utils.py")
+        github_utils = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(github_utils)
+        
+        spec = importlib.util.spec_from_file_location("llm_generator", "app/llm_generator.py")
+        llm_generator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(llm_generator)
+        
+        spec = importlib.util.spec_from_file_location("notify", "app/notify.py")
+        notify = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(notify)
+        
+        # Create aliases
+        create_repo = github_utils.create_repo
+        create_or_update_file = github_utils.create_or_update_file
+        enable_pages = github_utils.enable_pages
+        generate_mit_license = github_utils.generate_mit_license
+        create_or_update_binary_file = github_utils.create_or_update_binary_file
+        generate_app_code = llm_generator.generate_app_code
+        decode_attachments = llm_generator.decode_attachments
+        notify_evaluation_server = notify.notify_evaluation_server
+        
+        st.success("? Modules imported successfully using importlib")
+    except Exception as e2:
+        st.error(f"Second import attempt failed: {e2}")
+        st.stop()
 
 # Initialize session state
 if 'processed_requests' not in st.session_state:
@@ -117,17 +147,17 @@ def process_request(data):
 def main():
     st.set_page_config(
         page_title="GitHub App Generator",
-        page_icon="🚀",
+        page_icon="??",
         layout="wide"
     )
     
-    st.title("🚀 GitHub App Generator")
+    st.title("?? GitHub App Generator")
     st.markdown("Generate and deploy web applications directly to GitHub")
     
     # Sidebar for configuration
     with st.sidebar:
         st.header("Configuration")
-        st.info("Ensure your environment variables are set in .env file")
+        st.info("Ensure your environment variables are set in Streamlit Secrets")
         
         # Display current configuration
         if st.button("Check Configuration"):
@@ -135,9 +165,9 @@ def main():
             for var in required_vars:
                 value = os.getenv(var)
                 if value:
-                    st.success(f"✅ {var}: Set")
+                    st.success(f"? {var}: Set")
                 else:
-                    st.error(f"❌ {var}: Missing")
+                    st.error(f"? {var}: Missing")
     
     # Main form
     with st.form("app_generator_form"):
@@ -218,7 +248,7 @@ def main():
             result, success = process_request(data)
             
             if result:
-                st.success("✅ Application generated successfully!")
+                st.success("? Application generated successfully!")
                 
                 # Display results
                 col1, col2, col3 = st.columns(3)
@@ -239,9 +269,9 @@ def main():
                         st.metric("Latest Commit", result["commit_sha"][:8])
                 
                 if not success:
-                    st.warning("⚠️ Could not notify evaluation server")
+                    st.warning("?? Could not notify evaluation server")
             else:
-                st.error("❌ Failed to generate application")
+                st.error("? Failed to generate application")
     
     # Display processed requests
     st.header("Recent Requests")
